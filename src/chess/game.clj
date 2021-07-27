@@ -83,11 +83,9 @@
 (defmulti ^:private can-move? (fn [piece _ _] (:type piece)))
 
 (defmethod can-move? :rook [_ from to]
-  (and
-   (<= (distance from to) 7)
-   (or
-    (same-col? from to)
-    (same-row?  from to))))
+  (or
+   (same-col? from to)
+   (same-row?  from to)))
 
 (defmethod can-move? :knight [_ from to]
   (let [from-x (-> from :row row-to-int)
@@ -105,17 +103,13 @@
      (and (-> from-x (- 1) (= to-x)) (-> from-y (- 2) (= to-y))))))
 
 (defmethod can-move? :bishop [_ from to]
-  (and
-   (<= (distance from to) 7)
-   (same-diagonal? from to)))
+  (same-diagonal? from to))
 
 (defmethod can-move? :queen [_ from to]
-  (and
-   (<= (distance from to) 7)
-   (or
-    (same-col? from to)
-    (same-row?  from to)
-    (same-diagonal?  from to))))
+  (or
+   (same-col? from to)
+   (same-row?  from to)
+   (same-diagonal?  from to)))
 
 (defmethod can-move? :king [_ from to]
   (and
@@ -174,11 +168,11 @@
                                               (and (> row-from row-to) (< col-from col-to)) [-1 1]))]
     (loop [curr from]
       (cond
-       (= curr to) false
-       (pieces curr) true
-       :else (recur (assoc curr
-                           :row (-> curr :row (row-plus (first step)))
-                           :col (-> curr :col (col-plus (last step)))))))))
+        (= curr to) false
+        (pieces curr) true
+        :else (recur (assoc curr
+                            :row (-> curr :row (row-plus (first step)))
+                            :col (-> curr :col (col-plus (last step)))))))))
 
 (defn move [pieces color move]
   (let [movement (parse-movement move)
