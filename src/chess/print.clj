@@ -29,7 +29,7 @@
   (fn [string]
     (str (set-bg code) string (reset-bg))))
 
-(def ^:private piece-symbols {:king "♚" :queen "♛" :rook "♜" :bishop "♝" :knight "♞" :pawn "♟︎"})
+(def ^:private piece-symbols {:king "♚" :queen "♛" :rook "♜" :bishop "♝" :knight "♞" :pawn "♟︎" nil " "})
 
 (defn- color-cell [nrow ncol]
   (if (nrow #{:1 :3 :5 :7})
@@ -39,19 +39,15 @@
       (-> theme :bg-black bg) (-> theme :bg-white bg))))
 
 (defn- color-piece [piece]
-  (if (= :black (:color piece))
-    (-> theme :fg-black fg)
-    (-> theme :fg-white fg)))
+  (-> piece :color {:black (-> theme :fg-black fg)
+                    :white (-> theme :fg-white fg)
+                    nil    str}))
 
 (defn- color [piece nrow ncol]
-  [(color-cell nrow ncol)
-   (color-piece piece)])
+  [(color-cell nrow ncol) (color-piece piece)])
 
 (defn- draw-piece [cell]
-  (str
-   " "
-   (if (nil? cell) " " (-> cell :type piece-symbols))
-   " "))
+  (str " " (-> cell :type piece-symbols) " "))
 
 (defn- cell-to-string [piece nrow ncol]
   (reduce
