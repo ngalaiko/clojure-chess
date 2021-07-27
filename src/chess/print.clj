@@ -1,35 +1,62 @@
 (ns chess.print
-  (:require [clojure.string :as string])
-  (:require [clojure.term.colors :as colors]))
+  (:require [clojure.string :as string]))
+
+(def ^:private theme {:bg-black "14"
+                      :bg-white "6"
+                      :fg-black "0"
+                      :fg-white "15"})
+
+(def ^:private ESC "\033")
+
+(defn- set-fg [code]
+  (str ESC "[38;5;" code "m"))
+
+(defn- set-bg [code]
+  (str ESC "[48;5;" code "m"))
+
+(defn- reset-fg []
+  (str ESC "[m"))
+
+(defn- reset-bg []
+  (str ESC "[m"))
+
+(defn- fg [code]
+  (fn [string]
+    (str (set-fg code) string (reset-fg))))
+
+(defn- bg [code]
+  (fn [string]
+    (str (set-bg code) string (reset-bg))))
 
 (def ^:private piece-symbols {:king "♚" :queen "♛" :rook "♜" :bishop "♝" :knight "♞" :pawn "♟︎"})
 
-(defn- symbol-for-piece [cell]
+(defn- color-cell [nrow ncol]
+  (if (nrow #{:1 :3 :5 :7})
+    (if (ncol #{:a :c :e :g})
+      (-> theme :bg-white bg) (-> theme :bg-black bg))
+    (if (ncol #{:a :c :e :g})
+      (-> theme :bg-black bg) (-> theme :bg-white bg))))
+
+(defn- color-piece [piece]
+  (if (= :black (:color piece))
+    (-> theme :fg-black fg)
+    (-> theme :fg-white fg)))
+
+(defn- color [piece nrow ncol]
+  [(color-cell nrow ncol)
+   (color-piece piece)])
+
+(defn- draw-piece [cell]
   (str
    " "
    (if (nil? cell) " " (-> cell :type piece-symbols))
    " "))
 
-(defn- color-background [nrow ncol]
-  (if (nrow #{:1 :3 :5 :7})
-    (if (ncol #{:a :c :e :g})
-      colors/on-white colors/on-yellow)
-    (if (ncol #{:a :c :e :g})
-      colors/on-yellow colors/on-white)))
-
-(defn- color-piece [piece]
-  (if (= :black (:color piece))
-    colors/red
-    colors/concealed))
-
-(defn- colors-for-cell [piece nrow ncol]
-  [(color-background nrow ncol) (color-piece piece)])
-
 (defn- cell-to-string [piece nrow ncol]
   (reduce
    (fn [symbol color] (color symbol))
-   (symbol-for-piece piece)
-   (colors-for-cell piece nrow ncol)))
+   (draw-piece piece)
+   (color piece nrow ncol)))
 
 (defn- draw-row [pieces nrow]
   (str " " (name nrow) " "
