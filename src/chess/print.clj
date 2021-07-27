@@ -1,6 +1,7 @@
 (ns chess.print
   (:require [clojure.string :as string]))
 
+; https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
 (def ^:private theme {:bg-black "14"
                       :bg-white "6"
                       :fg-black "0"
