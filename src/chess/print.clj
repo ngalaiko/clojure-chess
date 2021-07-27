@@ -1,4 +1,4 @@
-(ns clojure-chess.print
+(ns chess.print
   (:require [clojure.string :as string])
   (:require [clojure.term.colors :as colors]))
 

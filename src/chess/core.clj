@@ -1,6 +1,6 @@
-(ns clojure-chess.core
-  (:require [clojure-chess.chess :as chess]
-            [clojure-chess.print :as print]))
+(ns chess.core
+  (:require [chess.game :as game]
+            [chess.print :as print]))
 
 (def ^:private next-color {:white :black
                            :black :white})
@@ -13,7 +13,7 @@
   (flush)
   (try (->>
         (read-line)
-        (chess/move pieces color)
+        (game/move pieces color)
         (play (color next-color)))
        (catch Exception e ((let [error-message (ex-message e)]
                              (println error-message)
@@ -22,4 +22,4 @@
 (defn main [& args]
   (println "Welcome to Clojure-chess!")
   (println "Play using algebraic chess notation (i.e. \"e4\" or \"Nc3\")")
-  (play :white chess/pieces))
+  (play :white game/pieces))

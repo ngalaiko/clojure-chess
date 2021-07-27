@@ -1,4 +1,4 @@
-(ns clojure-chess.chess)
+(ns chess.game)
 
 (defn- piece [color type] {:color color :type type})
 (defn- cell [col row] {:col col :row row})
