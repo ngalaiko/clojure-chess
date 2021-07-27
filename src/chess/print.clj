@@ -4,8 +4,6 @@
 
 (def ^:private piece-symbols {:king "♚" :queen "♛" :rook "♜" :bishop "♝" :knight "♞" :pawn "♟︎"})
 
-(def ^:private row-symbols {:1 "1" :2 "2" :3 "3" :4 "4" :5 "5" :6 "6" :7 "7" :8 "8"})
-
 (defn- symbol-for-piece [cell]
   (str
    " "

@@ -33,13 +33,13 @@
 
 (defn- row-plus [row value]
   (let [result (-> row row-to-int (+ value) int-to-row)]
-    (if (#{:1 :2 :3 :4 :5 :6 :7 :8} result)
+    (if (some? result)
       result
       (throw (ex-info (str "Resulting row out of bounds") {:row result})))))
 
 (defn- col-plus [col value]
   (let [result (-> col col-to-int (+ value) int-to-col)]
-    (if (#{:a :b :c :d :e :f :g :h} result)
+    (if (some? result)
       result
       (throw (ex-info (str "Resulting column out of bounds") {:col result})))))
 
@@ -173,7 +173,7 @@
                                               (and (> row-from row-to) (> col-from col-to)) [-1 -1]
                                               (and (> row-from row-to) (< col-from col-to)) [-1 1]))]
     (loop [curr from]
-      (case
+      (cond
        (= curr to) false
        (pieces curr) true
        :else (recur (assoc curr
@@ -200,7 +200,7 @@
                           (not (any-obsticles? pieces piece from to))))
                       pieces))
         _ (when (nil? valid-piece) (throw (ex-info (str "Invalid move") {:move move})))
-        from (first valid-piece)
+        from  (first valid-piece)
         piece (last valid-piece)]
     (assoc pieces
            from nil
