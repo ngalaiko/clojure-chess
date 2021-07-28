@@ -17,19 +17,22 @@
 (def ^:private int-to-col (flip-map col-to-int))
 
 (defn- parse-movement [movement]
-  (let [matcher (re-matcher
-                 #"(?<type>[KQBNR])?(?<hint>[abcdefgh])?(?<captures>x)?(?<col>[abcdefgh])(?<row>[12345678])(?<note>[+#!?])?"
-                 movement)]
-    (if (.matches matcher)
-      {:hint     (keyword (.group matcher "hint"))
-       :type     ({"K" :king "Q" :queen "B" :bishop "N" :knight "R" :rook "P" :pawn}
-                  (.group matcher "type")
-                  :pawn)
-       :captures (some? (.group matcher "captures"))
-       :cell     (cell (keyword (.group matcher "col")) (keyword (.group matcher "row")))
-       :note     ({"+" :check "#" :checkmate "!" :good-move "?" :poor-move}
-                  (.group matcher "note"))}
-      (throw (ex-info (str "Can't parse movement") {:movement movement})))))
+  (case movement
+    "0-0"   {:note :kingside-castle}
+    "0-0-0" {:note :queenside-castle}
+    (let [matcher (re-matcher
+                   #"(?<type>[KQBNR])?(?<hint>[abcdefgh])?(?<captures>x)?(?<col>[abcdefgh])(?<row>[12345678])(?<note>[+#!?])?"
+                   movement)]
+      (if (.matches matcher)
+        {:hint     (keyword (.group matcher "hint"))
+         :type     ({"K" :king "Q" :queen "B" :bishop "N" :knight "R" :rook "P" :pawn}
+                    (.group matcher "type")
+                    :pawn)
+         :captures (some? (.group matcher "captures"))
+         :cell     (cell (keyword (.group matcher "col")) (keyword (.group matcher "row")))
+         :note     ({"+" :check "#" :checkmate "!" :good-move "?" :poor-move}
+                    (.group matcher "note"))}
+        (throw (ex-info (str "Can't parse movement") {:movement movement}))))))
 
 (defn- row-plus [row value]
   (let [result (-> row row-to-int (+ value) int-to-row)]
@@ -148,11 +151,11 @@
     (= hint (:col from))
     true))
 
-(defmulti ^:private any-obsticles? (fn [_ piece _ _] (:type piece)))
+(defmulti ^:private any-obsticles? (fn [pieces from _] (:type (pieces from))))
 
-(defmethod any-obsticles? :knight [_ _ _ _] false)
+(defmethod any-obsticles? :knight [_ _ _] false)
 
-(defmethod any-obsticles? :default [pieces _ from to]
+(defmethod any-obsticles? :default [pieces from to]
   (let [row-from (-> from :row row-to-int)
         row-to   (-> to :row row-to-int)
         col-from (-> from :col col-to-int)
@@ -174,28 +177,30 @@
                             :row (-> curr :row (row-plus (first step)))
                             :col (-> curr :col (col-plus (last step)))))))))
 
-(defn move [pieces color move]
-  (let [movement (parse-movement move)
-        type (:type movement)
+(defn- find-piece [pieces color movement]
+  (let [type (:type movement)
         to   (:cell movement)
         hint (:hint movement)
-        target (pieces to)
-        valid-piece (first
-                     (filter
-                      #(let [piece (last %) from (first %)]
-                         (and
-                          (is-piece? piece color type)
-                          (use-hint from hint)
-                          (if target
-                            (and
-                             (not= color (:color target))
-                             (can-capture? piece from to))
-                            (can-move? piece from to))
-                          (not (any-obsticles? pieces piece from to))))
-                      pieces))
-        _ (when (nil? valid-piece) (throw (ex-info (str "Invalid move") {:move move})))
-        from  (first valid-piece)
-        piece (last valid-piece)]
+        target (pieces to)]
+    (first
+     (filter
+      #(let [piece (last %) from (first %)]
+         (and
+          (is-piece? piece color type)
+          (use-hint from hint)
+          (if target
+            (and
+             (not= color (:color target))
+             (can-capture? piece from to))
+            (can-move? piece from to))
+          (not (any-obsticles? pieces from to))))
+      pieces))))
+
+(defn move [pieces color movement]
+  (let [movement (parse-movement movement)
+        to (:cell movement)
+        [from piece] (find-piece pieces color movement)]
+    (when (nil? piece) (throw (ex-info (str "Invalid move") {:move movement})))
     (assoc pieces
            from nil
            to piece)))
