@@ -15,54 +15,50 @@
 (defn- set-bg [code]
   (str ESC "[48;5;" code "m"))
 
-(defn- reset-fg []
-  (str ESC "[m"))
-
-(defn- reset-bg []
+(defn- reset []
   (str ESC "[m"))
 
 (defn- fg [code]
   (fn [string]
-    (str (set-fg code) string (reset-fg))))
+    (str (set-fg code) string (reset))))
 
 (defn- bg [code]
   (fn [string]
-    (str (set-bg code) string (reset-bg))))
+    (str (set-bg code) string (reset))))
 
-(def ^:private piece-symbols {:king "♚" :queen "♛" :rook "♜" :bishop "♝" :knight "♞" :pawn "♟︎" nil " "})
-
-(defn- color-cell [nrow ncol]
+(defn- bg-for [nrow ncol]
   (if (nrow #{:1 :3 :5 :7})
     (if (ncol #{:a :c :e :g})
       (-> theme :bg-white bg) (-> theme :bg-black bg))
     (if (ncol #{:a :c :e :g})
       (-> theme :bg-black bg) (-> theme :bg-white bg))))
 
-(defn- color-piece [piece]
+(defn- fg-for [piece]
   (-> piece :color {:black (-> theme :fg-black fg)
                     :white (-> theme :fg-white fg)
                     nil    str}))
 
-(defn- color [piece nrow ncol]
-  [(color-cell nrow ncol) (color-piece piece)])
+(defn- colors-for [piece nrow ncol]
+  [(bg-for nrow ncol) (fg-for piece)])
 
 (defn- draw-piece [cell]
-  (str " " (-> cell :type piece-symbols) " "))
+  (let [piece-symbols {:king "♚" :queen "♛" :rook "♜" :bishop "♝" :knight "♞" :pawn "♟︎" nil " "}]
+    (str " " (-> cell :type piece-symbols) " ")))
 
-(defn- cell-to-string [piece nrow ncol]
+(defn- draw-cell [piece nrow ncol]
   (reduce
-   (fn [symbol color] (color symbol))
+   (fn [piece color] (color piece))
    (draw-piece piece)
-   (color piece nrow ncol)))
+   (colors-for piece nrow ncol)))
 
 (defn- draw-row [pieces nrow]
   (str " " (name nrow) " "
        (let [cols [:a :b :c :d :e :f :g :h]]
-         (string/join "" (map (fn [ncol] (cell-to-string (pieces {:col ncol :row nrow}) nrow ncol)) cols)))))
+         (string/join "" (map (fn [ncol] (draw-cell (pieces {:col ncol :row nrow}) nrow ncol)) cols)))))
 
 (defn draw [pieces as]
   (str
    (let [rows [:1 :2 :3 :4 :5 :6 :7 :8]
          rows (if (= as :white) (reverse rows) rows)]
-     (string/join "\n" (map (fn [nrow] (draw-row pieces nrow)) rows)))
+     (string/join "\n" (map #(draw-row pieces %) rows)))
    "\n    a  b  c  d  e  f  g  h "))
