@@ -83,7 +83,7 @@
         dy (-> y1 (- y2) abs)]
     (max dx dy)))
 
-(defmulti ^:private can-move? (fn [piece _ _] (:type piece)))
+(defmulti ^:private can-move? (fn [pieces from _] (:type (pieces from))))
 
 (defmethod can-move? :rook [_ from to]
   (or
@@ -122,10 +122,10 @@
     (same-row?  from to)
     (same-diagonal?  from to))))
 
-(defmethod can-move? :pawn [piece from to]
+(defmethod can-move? :pawn [pieces from to]
   (and
    (same-col? from to)
-   (case (:color piece)
+   (case (:color (pieces from))
      :white (upwards? from to)
      :black (downwards? from to))
    (case (:row from)
@@ -133,18 +133,18 @@
      :7 (<= (distance from to) 2)
      (= 1 (distance from to)))))
 
-(defmulti ^:private can-capture? (fn [piece _ _] (:type piece)))
+(defmulti ^:private can-capture? (fn [pieces from _] (:type (pieces from))))
 
-(defmethod can-capture? :pawn [piece from at]
+(defmethod can-capture? :pawn [pieces from at]
   (and
    (same-diagonal? from at)
    (= 1 (distance from at))
-   (case (:color piece)
+   (case (:color (pieces from))
      :white (upwards? from at)
      :black (downwards? from at))))
 
-(defmethod can-capture? :default [piece from at]
-  (can-move? piece from at))
+(defmethod can-capture? :default [pieces from at]
+  (can-move? pieces from at))
 
 (defn- use-hint [from hint]
   (if hint
@@ -191,8 +191,8 @@
           (if target
             (and
              (not= color (:color target))
-             (can-capture? piece from to))
-            (can-move? piece from to))
+             (can-capture? pieces from to))
+            (can-move? pieces from to))
           (not (any-obsticles? pieces from to))))
       pieces))))
 
