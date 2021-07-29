@@ -1,6 +1,7 @@
 (ns chess.core
   (:require [chess.game :as game]
-            [chess.print :as print]))
+            [chess.print :as print])
+  (:gen-class))
 
 (def ^:private next-color {:white :black
                            :black :white})
@@ -19,7 +20,7 @@
                              (println error-message)
                              (play color pieces))))))
 
-(defn main [& args]
+(defn -main [& args]
   (println "Welcome to Clojure-chess!")
   (println "Play using algebraic chess notation (i.e. \"e4\" or \"Nc3\")")
   (play :white game/pieces))
