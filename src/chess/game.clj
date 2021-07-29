@@ -1,6 +1,6 @@
 (ns chess.game)
 
-(defn- piece [color type] {:color color :type type})
+(defn- piece [color type] {:color color :type type :moved false})
 (defn- cell [col row] {:col col :row row})
 
 (def pieces {(cell :a :8) (piece :black :rook) (cell :b :8) (piece :black :knight) (cell :c :8) (piece :black :bishop) (cell :d :8) (piece :black :queen) (cell :e :8) (piece :black :king) (cell :f :8) (piece :black :bishop) (cell :g :8) (piece :black :knight) (cell :h :8) (piece :black :rook)
@@ -45,11 +45,6 @@
     (if (some? result)
       result
       (throw (ex-info (str "Resulting column out of bounds") {:col result})))))
-
-(defn- is-piece? [piece color type]
-  (and
-   (-> piece :color (= color))
-   (-> piece :type (= type))))
 
 (defn- same-row? [cell1 cell2]
   (= (:row cell1) (:row cell2)))
@@ -146,11 +141,6 @@
 (defmethod can-capture? :default [pieces from at]
   (can-move? pieces from at))
 
-(defn- use-hint [from hint]
-  (if hint
-    (= hint (:col from))
-    true))
-
 (defmulti ^:private any-obsticles? (fn [pieces from _] (:type (pieces from))))
 
 (defmethod any-obsticles? :knight [_ _ _] false)
@@ -186,8 +176,9 @@
      (filter
       #(let [piece (last %) from (first %)]
          (and
-          (is-piece? piece color type)
-          (use-hint from hint)
+          (-> piece :type  (= type))
+          (-> piece :color (= color))
+          (if hint (= hint (:col from)) true)
           (if target
             (and
              (not= color (:color target))
@@ -196,11 +187,43 @@
           (not (any-obsticles? pieces from to))))
       pieces))))
 
-(defn move [pieces color movement]
-  (let [movement (parse-movement movement)
-        to (:cell movement)
-        [from piece] (find-piece pieces color movement)]
-    (when (nil? piece) (throw (ex-info (str "Invalid move") {:move movement})))
+(defn- castle [pieces {{king-from :from king-to :to} :king
+                       {rook-from :from rook-to :to} :rook}]
+  (let [king (pieces king-from)
+        rook (pieces rook-from)]
+    (when (:moved king) (throw (ex-info (str "Can't castle: king was moved") {})))
+    (when (:moved rook) (throw (ex-info (str "Can't castle: rook was moved") {})))
+    (when (any-obsticles? pieces king-from rook-from) (throw (ex-info (str "Can't castle: something is in the way") {})))
     (assoc pieces
-           from nil
-           to piece)))
+           king-from nil
+           rook-from nil
+           king-to (assoc king :moved true)
+           rook-to (assoc rook :moved true))))
+
+(defn- castle-kingside [pieces color]
+  (let [row (color {:white :1
+                    :black :8})]
+    (castle pieces {:king {:from (cell :e row)
+                           :to   (cell :g row)}
+                    :rook {:from (cell :h row)
+                           :to   (cell :f row)}})))
+
+(defn- castle-queenside [pieces color]
+  (let [row (color {:white :1
+                    :black :8})]
+    (castle pieces {:king {:from (cell :e row)
+                           :to   (cell :c row)}
+                    :rook {:from (cell :a row)
+                           :to   (cell :d row)}})))
+
+(defn move [pieces color movement]
+  (let [movement (parse-movement movement)]
+    (case (:note movement)
+      :kingside-castle  (castle-kingside  pieces color)
+      :queenside-castle (castle-queenside pieces color)
+      (let [to (:cell movement)
+            [from piece] (find-piece pieces color movement)]
+        (when (nil? piece) (throw (ex-info (str "Invalid move") {:move movement})))
+        (assoc pieces
+               from nil
+               to (assoc piece :moved true))))))

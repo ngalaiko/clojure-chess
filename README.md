@@ -10,8 +10,8 @@ $ lein run
 
 ## TODO
 
-* [ ] castle
 * [ ] pawn takes in passing (en passant)
+* [ ] pawn promotion
 * [ ] check
 * [ ] checkmate
 
