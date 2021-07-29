@@ -1,12 +1,12 @@
 (ns chess.game)
 
 (defn- piece [color type] {:color color :type type :moved false})
-(defn- cell [file rank] {:file file :rank rank})
+(defn- square [file rank] {:file file :rank rank})
 
-(def pieces {(cell :a :8) (piece :black :rook) (cell :b :8) (piece :black :knight) (cell :c :8) (piece :black :bishop) (cell :d :8) (piece :black :queen) (cell :e :8) (piece :black :king) (cell :f :8) (piece :black :bishop) (cell :g :8) (piece :black :knight) (cell :h :8) (piece :black :rook)
-             (cell :a :7) (piece :black :pawn) (cell :b :7) (piece :black :pawn)   (cell :c :7) (piece :black :pawn)   (cell :d :7) (piece :black :pawn)  (cell :e :7) (piece :black :pawn) (cell :f :7) (piece :black :pawn)   (cell :g :7) (piece :black :pawn)   (cell :h :7) (piece :black :pawn)
-             (cell :a :2) (piece :white :pawn) (cell :b :2) (piece :white :pawn)   (cell :c :2) (piece :white :pawn)   (cell :d :2) (piece :white :pawn)  (cell :e :2) (piece :white :pawn) (cell :f :2) (piece :white :pawn)   (cell :g :2) (piece :white :pawn)   (cell :h :2) (piece :white :pawn)
-             (cell :a :1) (piece :white :rook) (cell :b :1) (piece :white :knight) (cell :c :1) (piece :white :bishop) (cell :d :1) (piece :white :queen) (cell :e :1) (piece :white :king) (cell :f :1) (piece :white :bishop) (cell :g :1) (piece :white :knight) (cell :h :1) (piece :white :rook)})
+(def pieces {(square :a :8) (piece :black :rook) (square :b :8) (piece :black :knight) (square :c :8) (piece :black :bishop) (square :d :8) (piece :black :queen) (square :e :8) (piece :black :king) (square :f :8) (piece :black :bishop) (square :g :8) (piece :black :knight) (square :h :8) (piece :black :rook)
+             (square :a :7) (piece :black :pawn) (square :b :7) (piece :black :pawn)   (square :c :7) (piece :black :pawn)   (square :d :7) (piece :black :pawn)  (square :e :7) (piece :black :pawn) (square :f :7) (piece :black :pawn)   (square :g :7) (piece :black :pawn)   (square :h :7) (piece :black :pawn)
+             (square :a :2) (piece :white :pawn) (square :b :2) (piece :white :pawn)   (square :c :2) (piece :white :pawn)   (square :d :2) (piece :white :pawn)  (square :e :2) (piece :white :pawn) (square :f :2) (piece :white :pawn)   (square :g :2) (piece :white :pawn)   (square :h :2) (piece :white :pawn)
+             (square :a :1) (piece :white :rook) (square :b :1) (piece :white :knight) (square :c :1) (piece :white :bishop) (square :d :1) (piece :white :queen) (square :e :1) (piece :white :king) (square :f :1) (piece :white :bishop) (square :g :1) (piece :white :knight) (square :h :1) (piece :white :rook)})
 
 (defn- flip-map [map] (reduce #(assoc %1 (last %2) (first %2)) {} map))
 
@@ -18,8 +18,8 @@
 
 (defn- parse-movement [movement]
   (case movement
-    "0-0"   {:note :kingside-castle}
-    "0-0-0" {:note :queenside-castle}
+    "0-0"   {:castle :kingside}
+    "0-0-0" {:castle :queenside}
     (let [matcher (re-matcher
                    #"(?<type>[KQBNR])?(?<departurefile>[abcdefgh])?(?<departurerank>[123456789])?(?<captures>x)?(?<file>[abcdefgh])(?<rank>[12345678])(?<note>[+#!?])?"
                    movement)]
@@ -30,8 +30,8 @@
                      (.group matcher "type")
                      :pawn)
          :captures  (some? (.group matcher "captures"))
-         :cell      {:file (keyword (.group matcher "file"))
-                     :rank (keyword (.group matcher "rank"))}
+         :square      {:file (keyword (.group matcher "file"))
+                       :rank (keyword (.group matcher "rank"))}
          :note      ({"+" :check "#" :checkmate "!" :good-move "?" :poor-move}
                      (.group matcher "note"))}
         (throw (ex-info (str "Can't parse movement") {:movement movement}))))))
@@ -48,34 +48,34 @@
       result
       (throw (ex-info (str "Resulting fileumn out of bounds") {:file result})))))
 
-(defn- same-rank? [cell1 cell2]
-  (= (:rank cell1) (:rank cell2)))
+(defn- same-rank? [square1 square2]
+  (= (:rank square1) (:rank square2)))
 
-(defn- same-file? [cell1 cell2]
-  (= (:file cell1) (:file cell2)))
+(defn- same-file? [square1 square2]
+  (= (:file square1) (:file square2)))
 
 (defn- abs [n] (max n (- n)))
 
-(defn- same-diagonal? [cell1 cell2]
-  (let [x1 (-> cell1 :rank rank-to-int)
-        x2 (-> cell2 :rank rank-to-int)
-        y1 (-> cell1 :file file-to-int)
-        y2 (-> cell2 :file file-to-int)
+(defn- same-diagonal? [square1 square2]
+  (let [x1 (-> square1 :rank rank-to-int)
+        x2 (-> square2 :rank rank-to-int)
+        y1 (-> square1 :file file-to-int)
+        y2 (-> square2 :file file-to-int)
         dx (-> x1 (- x2) abs)
         dy (-> y1 (- y2) abs)]
     (= dx dy)))
 
-(defn- upwards? [cell1 cell2]
-  (< (-> cell1 :rank rank-to-int) (-> cell2 :rank rank-to-int)))
+(defn- upwards? [square1 square2]
+  (< (-> square1 :rank rank-to-int) (-> square2 :rank rank-to-int)))
 
-(defn- downwards? [cell1 cell2]
-  (> (-> cell1 :rank rank-to-int) (-> cell2 :rank rank-to-int)))
+(defn- downwards? [square1 square2]
+  (> (-> square1 :rank rank-to-int) (-> square2 :rank rank-to-int)))
 
-(defn- distance [cell1 cell2]
-  (let [x1 (-> cell1 :rank rank-to-int)
-        x2 (-> cell2 :rank rank-to-int)
-        y1 (-> cell1 :file file-to-int)
-        y2 (-> cell2 :file file-to-int)
+(defn- distance [square1 square2]
+  (let [x1 (-> square1 :rank rank-to-int)
+        x2 (-> square2 :rank rank-to-int)
+        y1 (-> square1 :file file-to-int)
+        y2 (-> square2 :file file-to-int)
         dx (-> x1 (- x2) abs)
         dy (-> y1 (- y2) abs)]
     (max dx dy)))
@@ -171,7 +171,7 @@
 
 (defn- find-piece [pieces color movement]
   (let [{type :type
-         to   :cell
+         to   :square
          {departure-file :file
           departure-rank :rank} :departure} movement
         target (pieces to)]
@@ -207,25 +207,25 @@
 (defn- castle-kingside [pieces color]
   (let [rank (color {:white :1
                      :black :8})]
-    (castle pieces {:king {:from (cell :e rank)
-                           :to   (cell :g rank)}
-                    :rook {:from (cell :h rank)
-                           :to   (cell :f rank)}})))
+    (castle pieces {:king {:from (square :e rank)
+                           :to   (square :g rank)}
+                    :rook {:from (square :h rank)
+                           :to   (square :f rank)}})))
 
 (defn- castle-queenside [pieces color]
   (let [rank (color {:white :1
                      :black :8})]
-    (castle pieces {:king {:from (cell :e rank)
-                           :to   (cell :c rank)}
-                    :rook {:from (cell :a rank)
-                           :to   (cell :d rank)}})))
+    (castle pieces {:king {:from (square :e rank)
+                           :to   (square :c rank)}
+                    :rook {:from (square :a rank)
+                           :to   (square :d rank)}})))
 
 (defn move [pieces color movement]
   (let [movement (parse-movement movement)]
-    (case (:note movement)
-      :kingside-castle  (castle-kingside  pieces color)
-      :queenside-castle (castle-queenside pieces color)
-      (let [to (:cell movement)
+    (case (:castle movement)
+      :kingside  (castle-kingside  pieces color)
+      :queenside (castle-queenside pieces color)
+      (let [to (:square movement)
             [from piece] (find-piece pieces color movement)]
         (when (nil? piece) (throw (ex-info (str "Invalid move") {:move movement})))
         (assoc pieces
