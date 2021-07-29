@@ -26,11 +26,11 @@
   (fn [string]
     (str (set-bg code) string (reset))))
 
-(defn- bg-for [nrank nfile]
-  (if (nrank #{:1 :3 :5 :7})
-    (if (nfile #{:a :c :e :g})
+(defn- bg-for [rank file]
+  (if (rank #{:1 :3 :5 :7})
+    (if (file #{:a :c :e :g})
       (-> theme :bg-white bg) (-> theme :bg-black bg))
-    (if (nfile #{:a :c :e :g})
+    (if (file #{:a :c :e :g})
       (-> theme :bg-black bg) (-> theme :bg-white bg))))
 
 (defn- fg-for [piece]
@@ -38,23 +38,23 @@
                     :white (-> theme :fg-white fg)
                     nil    str}))
 
-(defn- colors-for [piece nrank nfile]
-  [(bg-for nrank nfile) (fg-for piece)])
+(defn- colors-for [piece rank file]
+  [(bg-for rank file) (fg-for piece)])
 
-(defn- draw-piece [cell]
+(defn- draw-piece [square]
   (let [piece-symbols {:king "♚" :queen "♛" :rook "♜" :bishop "♝" :knight "♞" :pawn "♟︎" nil " "}]
-    (str " " (-> cell :type piece-symbols) " ")))
+    (str " " (-> square :type piece-symbols) " ")))
 
-(defn- draw-cell [piece nrank nfile]
+(defn- draw-square [piece rank file]
   (reduce
    (fn [piece color] (color piece))
    (draw-piece piece)
-   (colors-for piece nrank nfile)))
+   (colors-for piece rank file)))
 
-(defn- draw-rank [pieces nrank]
-  (str " " (name nrank) " "
+(defn- draw-rank [pieces rank]
+  (str " " (name rank) " "
        (let [files [:a :b :c :d :e :f :g :h]]
-         (string/join "" (map (fn [nfile] (draw-cell (pieces {:file nfile :rank nrank}) nrank nfile)) files)))))
+         (string/join "" (map (fn [file] (draw-square (pieces {:file file :rank rank}) rank file)) files)))))
 
 (defn draw [pieces as]
   (str
