@@ -166,21 +166,21 @@
         file-from (-> from :file file-to-int)
         file-to   (-> to :file file-to-int)
         pieces    (assoc pieces from nil to nil)
-        step      (cond
-                    (same-rank? from to) (if (< file-from file-to) [0 1] [0 -1])
-                    (same-file? from to) (if (< rank-from rank-to) [1 0] [-1 0])
-                    (same-diagonal? from to) (cond
-                                               (and (< rank-from rank-to) (< file-from file-to)) [1 1]
-                                               (and (< rank-from rank-to) (> file-from file-to)) [1 -1]
-                                               (and (> rank-from rank-to) (> file-from file-to)) [-1 -1]
-                                               (and (> rank-from rank-to) (< file-from file-to)) [-1 1]))]
+        [rank-step file-step] (cond
+                                (same-rank? from to) (if (< file-from file-to) [0 1] [0 -1])
+                                (same-file? from to) (if (< rank-from rank-to) [1 0] [-1 0])
+                                (same-diagonal? from to) (cond
+                                                           (and (< rank-from rank-to) (< file-from file-to)) [1 1]
+                                                           (and (< rank-from rank-to) (> file-from file-to)) [1 -1]
+                                                           (and (> rank-from rank-to) (> file-from file-to)) [-1 -1]
+                                                           (and (> rank-from rank-to) (< file-from file-to)) [-1 1]))]
     (loop [curr from]
       (cond
         (= curr to) false
         (pieces curr) true
         :else (recur (assoc curr
-                            :rank (-> curr :rank (rank-plus (first step)))
-                            :file (-> curr :file (file-plus (last step)))))))))
+                            :rank (-> curr :rank (rank-plus rank-step))
+                            :file (-> curr :file (file-plus file-step))))))))
 
 (defn- eligible-for-promotion? [piece to]
   (and
