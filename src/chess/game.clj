@@ -135,15 +135,26 @@
 (defmulti ^:private can-capture? (fn [pieces from _] (:type (pieces from))))
 
 (defmethod can-capture? :pawn [pieces from at]
-  (and
-   (same-diagonal? from at)
-   (= 1 (distance from at))
-   (case (:color (pieces from))
-     :white (upwards? from at)
-     :black (downwards? from at))))
+  (let [target (pieces at)]
+    (and
+     target
+     (not=
+      (:color (pieces from))
+      (:color target))
+     (same-diagonal? from at)
+     (= 1 (distance from at))
+     (case (:color (pieces from))
+       :white (upwards? from at)
+       :black (downwards? from at)))))
 
 (defmethod can-capture? :default [pieces from at]
-  (can-move? pieces from at))
+  (let [target (pieces at)]
+    (and
+     target
+     (not=
+      (:color (pieces from))
+      (:color target))
+     (can-move? pieces from at))))
 
 (defmulti ^:private any-obsticles? (fn [pieces from _] (:type (pieces from))))
 
@@ -154,15 +165,15 @@
         rank-to   (-> to :rank rank-to-int)
         file-from (-> from :file file-to-int)
         file-to   (-> to :file file-to-int)
-        pieces   (assoc pieces from nil to nil)
-        step     (cond
-                   (same-rank? from to) (if (< file-from file-to) [0 1] [0 -1])
-                   (same-file? from to) (if (< rank-from rank-to) [1 0] [-1 0])
-                   (same-diagonal? from to) (cond
-                                              (and (< rank-from rank-to) (< file-from file-to)) [1 1]
-                                              (and (< rank-from rank-to) (> file-from file-to)) [1 -1]
-                                              (and (> rank-from rank-to) (> file-from file-to)) [-1 -1]
-                                              (and (> rank-from rank-to) (< file-from file-to)) [-1 1]))]
+        pieces    (assoc pieces from nil to nil)
+        step      (cond
+                    (same-rank? from to) (if (< file-from file-to) [0 1] [0 -1])
+                    (same-file? from to) (if (< rank-from rank-to) [1 0] [-1 0])
+                    (same-diagonal? from to) (cond
+                                               (and (< rank-from rank-to) (< file-from file-to)) [1 1]
+                                               (and (< rank-from rank-to) (> file-from file-to)) [1 -1]
+                                               (and (> rank-from rank-to) (> file-from file-to)) [-1 -1]
+                                               (and (> rank-from rank-to) (< file-from file-to)) [-1 1]))]
     (loop [curr from]
       (cond
         (= curr to) false
@@ -183,7 +194,6 @@
          to   :square
          {departure-file :file
           departure-rank :rank} :departure} movement
-        target (pieces to)
         promotion (:promotion movement)]
     (first
      (filter
@@ -195,10 +205,8 @@
           (if departure-file (= departure-file (:file from)) true)
           (if departure-rank (= departure-rank (:rank from)) true)
           (if promotion (eligible-for-promotion? piece to) true)
-          (if target
-            (and
-             (not= color (:color target))
-             (can-capture? pieces from to))
+          (if (pieces to)
+            (can-capture? pieces from to)
             (can-move? pieces from to))
           (not (any-obsticles? pieces from to))))
       pieces))))
