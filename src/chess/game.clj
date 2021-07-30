@@ -171,35 +171,56 @@
                             :rank (-> curr :rank (rank-plus (first step)))
                             :file (-> curr :file (file-plus (last step)))))))))
 
+(defn- eligible-for-promotion? [piece to]
+  (and
+   (= (:type piece) :pawn)
+   (= (:rank to) (case (:color piece)
+                   :white :8
+                   :black :1))))
+
 (defn- find-piece [pieces color movement]
   (let [{type :type
          to   :square
          {departure-file :file
           departure-rank :rank} :departure} movement
-        target (pieces to)]
-    (first
-     (filter
-      #(let [piece (last %) from (first %)]
-         (and
-          (-> piece :type  (= type))
-          (-> piece :color (= color))
-          (if departure-file (= departure-file (:file from)) true)
-          (if departure-rank (= departure-rank (:rank from)) true)
-          (if target
-            (and
-             (not= color (:color target))
-             (can-capture? pieces from to))
-            (can-move? pieces from to))
-          (not (any-obsticles? pieces from to))))
-      pieces))))
+        target (pieces to)
+        promotion (:promotion movement)
+        [from piece] (first
+                      (filter
+                       #(let [from (first %)
+                              piece (last %)]
+                          (and
+                           (-> piece :type  (= type))
+                           (-> piece :color (= color))
+                           (if departure-file (= departure-file (:file from)) true)
+                           (if departure-rank (= departure-rank (:rank from)) true)
+                           (if promotion (eligible-for-promotion? piece to) true)
+                           (if target
+                             (and
+                              (not= color (:color target))
+                              (can-capture? pieces from to))
+                             (can-move? pieces from to))
+                           (not (any-obsticles? pieces from to))))
+                       pieces))]
+    (when (and
+           (eligible-for-promotion? piece to)
+           (nil? promotion))
+      (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
+    (cond
+      (nil? piece) (throw (ex-info (str "Invalid move") {:move movement}))
+      (some? promotion) [from (assoc piece :type promotion)]
+      :else       [from piece])))
 
 (defn- castle [pieces {{king-from :from king-to :to} :king
                        {rook-from :from rook-to :to} :rook}]
   (let [king (pieces king-from)
         rook (pieces rook-from)]
-    (when (:moved king) (throw (ex-info (str "Can't castle: king was moved") {})))
-    (when (:moved rook) (throw (ex-info (str "Can't castle: rook was moved") {})))
-    (when (any-obsticles? pieces king-from rook-from) (throw (ex-info (str "Can't castle: something is in the way") {})))
+    (when (:moved king)
+      (throw (ex-info (str "Can't castle: king was moved") {})))
+    (when (:moved rook)
+      (throw (ex-info (str "Can't castle: rook was moved") {})))
+    (when (any-obsticles? pieces king-from rook-from)
+      (throw (ex-info (str "Can't castle: something is in the way") {})))
     (assoc pieces
            king-from nil
            rook-from nil
@@ -222,21 +243,6 @@
                     :rook {:from (square :a rank)
                            :to   (square :d rank)}})))
 
-(defn- eligible-for-promotion? [piece to]
-  (and
-   (= :pawn (:type piece))
-   (case (:color piece)
-     :black (= :1 (:rank to))
-     :white (= :8 (:rank to)))))
-
-; todo: come up with a better name - this function does not always promote
-(defn- promote [piece to promotion]
-  (if (eligible-for-promotion? piece to)
-    (if (nil? promotion)
-      (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {}))
-      (assoc piece :type promotion))
-    piece))
-
 (defn move [pieces color movement]
   (let [movement (parse-movement movement)]
     (case (:castle movement)
@@ -244,8 +250,6 @@
       :queenside (castle-queenside pieces color)
       (let [to (:square movement)
             [from piece] (find-piece pieces color movement)]
-        (when (nil? piece) (throw (ex-info (str "Invalid move") {:move movement})))
         (assoc pieces
                from nil
-               to (assoc (promote piece to (:promotion movement))
-                         :moved true))))))
+               to (assoc piece :moved true))))))
