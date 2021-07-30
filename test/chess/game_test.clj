@@ -108,9 +108,9 @@
         (move :white "a3")   (move :black "a5")
         (move :white "axb4") (move :black "axb4")
         (move :white "Qa2")  (move :black "Bg6")
-        (move :white "d6")  (move :black "g4")
+        (move :white "d6")   (move :black "g4")
         (move :white "Qd2")  (move :black "Kg7")
-        (move :white "f3")  (move :black "Qxd6")
+        (move :white "f3")   (move :black "Qxd6")
         (move :white "fxg4") (move :black "Qd4+")
         (move :white "Kh1")  (move :black "Nf6")
         (move :white "Rf4")  (move :black "Ne4")
@@ -164,4 +164,12 @@
         (move :white "Kd1")  (move :black "Bb3+")
         (move :white "Kc1")  (move :black "Ne2+")
         (move :white "Kb1")  (move :black "Nc3+")
-        (move :white "Kc1")  (move :black "Rc2#"))))
+        (move :white "Kc1")  (move :black "Rc2#")))
+
+  (testing "A short game with promotion"
+    (-> pieces
+        (move :white "b4")      (move :black "c6")
+        (move :white "b5")      (move :black "Qb6")
+        (move :white "bxc6")    (move :black "Qd4")
+        (move :white "cxb7")    (move :black "Qxa1")
+        (move :white "bxc8=R#"))))

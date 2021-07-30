@@ -21,7 +21,7 @@
     "0-0"   {:castle :kingside}
     "0-0-0" {:castle :queenside}
     (let [matcher (re-matcher
-                   #"(?<type>[KQBNR])?(?<departurefile>[abcdefgh])?(?<departurerank>[123456789])?(?<captures>x)?(?<file>[abcdefgh])(?<rank>[12345678])(?<note>[+#!?])?"
+                   #"(?<type>[KQBNR])?(?<departurefile>[abcdefgh])?(?<departurerank>[123456789])?(?<captures>x)?(?<file>[abcdefgh])(?<rank>[12345678])=?(?<promotion>[QBNR])?(?<note>[+#!?])?"
                    movement)]
       (if (.matches matcher)
         {:departure {:file (keyword (.group matcher "departurefile"))
@@ -30,10 +30,12 @@
                      (.group matcher "type")
                      :pawn)
          :captures  (some? (.group matcher "captures"))
-         :square      {:file (keyword (.group matcher "file"))
-                       :rank (keyword (.group matcher "rank"))}
+         :square    {:file (keyword (.group matcher "file"))
+                     :rank (keyword (.group matcher "rank"))}
          :note      ({"+" :check "#" :checkmate "!" :good-move "?" :poor-move}
-                     (.group matcher "note"))}
+                     (.group matcher "note"))
+         :promotion ({"Q" :queen "B" :bishop "N" :knight "R" :rook}
+                     (.group matcher "promotion"))}
         (throw (ex-info (str "Can't parse movement") {:movement movement}))))))
 
 (defn- rank-plus [rank value]
@@ -220,6 +222,21 @@
                     :rook {:from (square :a rank)
                            :to   (square :d rank)}})))
 
+(defn- eligible-for-promotion? [piece to]
+  (and
+   (= :pawn (:type piece))
+   (case (:color piece)
+     :black (= :1 (:rank to))
+     :white (= :8 (:rank to)))))
+
+; todo: come up with a better name - this function does not always promote
+(defn- promote [piece to promotion]
+  (if (eligible-for-promotion? piece to)
+    (if (nil? promotion)
+      (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {}))
+      (assoc piece :type promotion))
+    piece))
+
 (defn move [pieces color movement]
   (let [movement (parse-movement movement)]
     (case (:castle movement)
@@ -230,4 +247,5 @@
         (when (nil? piece) (throw (ex-info (str "Invalid move") {:move movement})))
         (assoc pieces
                from nil
-               to (assoc piece :moved true))))))
+               to (assoc (promote piece to (:promotion movement))
+                         :moved true))))))

@@ -11,7 +11,6 @@ $ lein run
 ## TODO
 
 * [ ] pawn takes in passing (en passant)
-* [ ] pawn promotion
 * [ ] check
 * [ ] checkmate
 
