@@ -2,7 +2,7 @@
   (:require  [clojure.test :refer :all]
              [chess.game :refer :all]))
 
-(deftest play-valid-games
+(deftest valid-games
   (testing "Kasparov vs. Topalov, Wijk aan Zee 1999"
     (-> pieces
         (move :white "e4")    (move :black "d6")
@@ -166,10 +166,15 @@
         (move :white "Kb1")  (move :black "Nc3+")
         (move :white "Kc1")  (move :black "Rc2#")))
 
-  (testing "A short game with promotion"
+  (testing "Chess promotion"
     (-> pieces
         (move :white "b4")      (move :black "c6")
         (move :white "b5")      (move :black "Qb6")
         (move :white "bxc6")    (move :black "Qd4")
         (move :white "cxb7")    (move :black "Qxa1")
         (move :white "bxc8=R#"))))
+  ;(testing "En passant"
+    ;(-> pieces
+        ;(move :white "e4")   (move :black "e6")
+        ;(move :white "e5")   (move :black "d5")
+        ;(move :white "exd6"))))

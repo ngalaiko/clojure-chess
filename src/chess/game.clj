@@ -1,6 +1,6 @@
 (ns chess.game)
 
-(defn- piece [color type] {:color color :type type :moved false})
+(defn- piece [color type] {:color color :type type :moved nil})
 (defn- square [file rank] {:file file :rank rank})
 
 (def pieces {(square :a :8) (piece :black :rook) (square :b :8) (piece :black :knight) (square :c :8) (piece :black :bishop) (square :d :8) (piece :black :queen) (square :e :8) (piece :black :king) (square :f :8) (piece :black :bishop) (square :g :8) (piece :black :knight) (square :h :8) (piece :black :rook)
@@ -189,7 +189,7 @@
                    :white :8
                    :black :1))))
 
-(defn- find-piece [pieces color movement]
+(defn- find-a-piece-to-move [pieces color movement]
   (let [{type :type
          to   :square
          {departure-file :file
@@ -211,10 +211,34 @@
           (not (any-obsticles? pieces from to))))
       pieces))))
 
+(defn- find-last-move [pieces]
+  (->> pieces
+       (map #(-> % last :moved))
+       (map #(if (nil? %) 0 %))
+       (apply max)))
+
+(defn- make-a-move [pieces color movement]
+  (let [last-move (find-last-move pieces)
+        promote-to (:promotion movement)
+        to (:square movement)
+        [from piece] (find-a-piece-to-move pieces color movement)]
+    (when (nil? piece)
+      (throw (ex-info (str "Can't move like that") {:move movement})))
+    (when (and
+           (eligible-for-promotion? piece to)
+           (nil? promote-to))
+      (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
+    (let [piece (if promote-to (assoc piece :type promote-to) piece)
+          piece (assoc piece :moved (+ 1 last-move))]
+      (assoc pieces
+             from nil
+             to piece))))
+
 (defn- castle [pieces {{king-from :from king-to :to} :king
                        {rook-from :from rook-to :to} :rook}]
   (let [king (pieces king-from)
-        rook (pieces rook-from)]
+        rook (pieces rook-from)
+        last-move (find-last-move pieces)]
     (when (:moved king)
       (throw (ex-info (str "Can't castle: king was moved") {})))
     (when (:moved rook)
@@ -224,8 +248,8 @@
     (assoc pieces
            king-from nil
            rook-from nil
-           king-to (assoc king :moved true)
-           rook-to (assoc rook :moved true))))
+           king-to (assoc king :moved (+ 1 last-move))
+           rook-to (assoc rook :moved (+ 1 last-move)))))
 
 (defn- castle-kingside [pieces color]
   (let [rank (color {:white :1
@@ -243,22 +267,9 @@
                     :rook {:from (square :a rank)
                            :to   (square :d rank)}})))
 
-(defn move [pieces color movement]
-  (let [movement (parse-movement movement)]
+(defn move [pieces color move]
+  (let [movement (parse-movement move)]
     (case (:castle movement)
       :kingside  (castle-kingside  pieces color)
       :queenside (castle-queenside pieces color)
-      (let [promotion (:promotion movement)
-            to (:square movement)
-            [from piece] (find-piece pieces color movement)]
-        (when (nil? piece)
-          (throw (ex-info (str "Can't move like that") {:move movement})))
-        (when (and
-               (eligible-for-promotion? piece to)
-               (nil? promotion))
-          (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
-        (assoc pieces
-               from nil
-               to (assoc (if promotion
-                           (assoc piece :type promotion)
-                           piece) :moved true))))))
+      (make-a-move pieces color movement))))
