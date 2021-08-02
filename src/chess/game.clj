@@ -239,7 +239,29 @@
             (can-move? pieces from to))))
       pieces))))
 
-(defn- get-moves [pieces color movement]
+(defn move-piece [from to]
+  (fn [pieces]
+    (let [piece (pieces from)]
+      (assoc pieces
+             from nil
+             to piece))))
+
+(defn mark-moved [& at]
+  (fn [pieces]
+    (let [last-move (find-last-move pieces)]
+      (reduce (fn [pieces at]
+                (let [piece (pieces at)
+                      moved-piece (assoc piece :moved (+ 1 last-move))]
+                  (assoc pieces
+                         at moved-piece)))
+              pieces
+              at))))
+
+(defn move-noop [] (fn [pieces] pieces))
+
+(defmulti ^:private get-moves (fn [_ _ movement] (:castle movement)))
+
+(defmethod get-moves :default [pieces color movement]
   (let [promote-to (:promotion movement)
         move-to (:to movement)
         [move-from piece] (find-a-piece-to-move pieces color movement)]
@@ -249,51 +271,37 @@
            (eligible-for-promotion? piece move-to)
            (nil? promote-to))
       (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
-    [(fn [pieces] ;; move piece
-       (let [piece (pieces move-from)]
-         (assoc pieces
-                move-from nil
-                move-to piece)))
-     (fn [pieces] ;; mark piece as moved
-       (let [piece (pieces move-to)
-             last-move (find-last-move pieces)
-             moved-piece (assoc piece :moved (+ 1 last-move))]
-         (assoc pieces
-                move-to moved-piece)))
+    [(move-piece move-from move-to)
+     (mark-moved move-to)
      (if promote-to ;; promote piece
        (fn [pieces]
          (let [piece (pieces move-to)
                promoted-piece (assoc piece :type promote-to)]
            (assoc pieces
                   move-to promoted-piece)))
-       (fn [pieces] pieces) ;; noop
-       )
+       (move-noop))
      (if (en-passant? pieces move-from move-to)
        (fn [pieces] ;; en passant capture
          (let [en-passant-target (square (:file move-to) (:rank move-from))]
            (assoc pieces
                   en-passant-target nil)))
-       (fn [pieces] pieces) ;; noop
-       )]))
+       (move-noop))]))
 
 (defn- castle [pieces {{king-from :from king-to :to} :king
                        {rook-from :from rook-to :to} :rook}]
   (let [king (pieces king-from)
-        rook (pieces rook-from)
-        last-move (find-last-move pieces)]
+        rook (pieces rook-from)]
     (when (:moved king)
       (throw (ex-info (str "Can't castle: king was moved") {})))
     (when (:moved rook)
       (throw (ex-info (str "Can't castle: rook was moved") {})))
     (when (any-obsticles? pieces king-from rook-from)
       (throw (ex-info (str "Can't castle: something is in the way") {})))
-    (assoc pieces
-           king-from nil
-           rook-from nil
-           king-to (assoc king :moved (+ 1 last-move))
-           rook-to (assoc rook :moved (+ 1 last-move)))))
+    [(move-piece king-from king-to)
+     (move-piece rook-from rook-to)
+     (mark-moved rook-to king-to)]))
 
-(defn- castle-queenside [pieces color]
+(defmethod get-moves :queenside [pieces color _]
   (let [rank (color {:white :1
                      :black :8})]
     (castle pieces {:king {:from (square :e rank)
@@ -301,7 +309,7 @@
                     :rook {:from (square :a rank)
                            :to   (square :d rank)}})))
 
-(defn- castle-kingside [pieces color]
+(defmethod get-moves :kingside [pieces color _]
   (let [rank (color {:white :1
                      :black :8})]
     (castle pieces {:king {:from (square :e rank)
@@ -311,10 +319,7 @@
 
 (defn move [pieces color move]
   (let [movement (parse-movement move)]
-    (case (:castle movement)
-      :kingside  (castle-kingside  pieces color)
-      :queenside (castle-queenside pieces color)
-      (reduce
-       (fn [pieces move] (move pieces))
-       pieces
-       (get-moves pieces color movement)))))
+    (reduce
+     (fn [pieces move] (move pieces))
+     pieces
+     (get-moves pieces color movement))))
