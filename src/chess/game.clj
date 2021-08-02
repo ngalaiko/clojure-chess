@@ -67,6 +67,32 @@
         dy (-> y1 (- y2) abs)]
     (= dx dy)))
 
+(defmulti ^:private any-obsticles? (fn [pieces from _] (:type (pieces from))))
+
+(defmethod any-obsticles? :knight [_ _ _] false)
+
+(defmethod any-obsticles? :default [pieces from to]
+  (let [rank-from (-> from :rank rank-to-int)
+        rank-to   (-> to :rank rank-to-int)
+        file-from (-> from :file file-to-int)
+        file-to   (-> to :file file-to-int)
+        pieces    (assoc pieces from nil)
+        [rank-step file-step] (cond
+                                (same-rank? from to) (if (< file-from file-to) [0 1] [0 -1])
+                                (same-file? from to) (if (< rank-from rank-to) [1 0] [-1 0])
+                                (same-diagonal? from to) (cond
+                                                           (and (< rank-from rank-to) (< file-from file-to)) [1 1]
+                                                           (and (< rank-from rank-to) (> file-from file-to)) [1 -1]
+                                                           (and (> rank-from rank-to) (> file-from file-to)) [-1 -1]
+                                                           (and (> rank-from rank-to) (< file-from file-to)) [-1 1]))]
+    (loop [curr from]
+      (cond
+        (= curr to) false
+        (pieces curr) true
+        :else (recur (assoc curr
+                            :rank (-> curr :rank (rank-plus rank-step))
+                            :file (-> curr :file (file-plus file-step))))))))
+
 (defn- upwards? [square1 square2]
   (< (-> square1 :rank rank-to-int) (-> square2 :rank rank-to-int)))
 
@@ -84,10 +110,12 @@
 
 (defmulti ^:private can-move? (fn [pieces from _] (:type (pieces from))))
 
-(defmethod can-move? :rook [_ from to]
-  (or
-   (same-file? from to)
-   (same-rank?  from to)))
+(defmethod can-move? :rook [pieces from to]
+  (and
+   (or
+    (same-file? from to)
+    (same-rank? from to))
+   (not (any-obsticles? pieces from to))))
 
 (defmethod can-move? :knight [_ from to]
   (let [from-x (-> from :rank rank-to-int)
@@ -104,22 +132,27 @@
      (and (-> from-x (- 1) (= to-x)) (-> from-y (+ 2) (= to-y)))
      (and (-> from-x (- 1) (= to-x)) (-> from-y (- 2) (= to-y))))))
 
-(defmethod can-move? :bishop [_ from to]
-  (same-diagonal? from to))
+(defmethod can-move? :bishop [pieces from to]
+  (and
+   (same-diagonal? from to)
+   (not (any-obsticles? pieces from to))))
 
-(defmethod can-move? :queen [_ from to]
-  (or
-   (same-file? from to)
-   (same-rank?  from to)
-   (same-diagonal?  from to)))
+(defmethod can-move? :queen [pieces from to]
+  (and
+   (or
+    (same-file? from to)
+    (same-rank? from to)
+    (same-diagonal? from to))
+   (not (any-obsticles? pieces from to))))
 
-(defmethod can-move? :king [_ from to]
+(defmethod can-move? :king [pieces from to]
   (and
    (<= (distance from to) 1)
    (or
     (same-file? from to)
-    (same-rank?  from to)
-    (same-diagonal?  from to))))
+    (same-rank? from to)
+    (same-diagonal? from to))
+   (not (any-obsticles? pieces from to))))
 
 (defmethod can-move? :pawn [pieces from to]
   (and
@@ -130,7 +163,8 @@
    (case (:rank from)
      :2 (<= (distance from to) 2)
      :7 (<= (distance from to) 2)
-     (= 1 (distance from to)))))
+     (= 1 (distance from to)))
+   (not (any-obsticles? pieces from to))))
 
 (defmulti ^:private can-capture? (fn [pieces from _] (:type (pieces from))))
 
@@ -156,32 +190,6 @@
       (:color target))
      (can-move? pieces from at))))
 
-(defmulti ^:private any-obsticles? (fn [pieces from _] (:type (pieces from))))
-
-(defmethod any-obsticles? :knight [_ _ _] false)
-
-(defmethod any-obsticles? :default [pieces from to]
-  (let [rank-from (-> from :rank rank-to-int)
-        rank-to   (-> to :rank rank-to-int)
-        file-from (-> from :file file-to-int)
-        file-to   (-> to :file file-to-int)
-        pieces    (assoc pieces from nil to nil)
-        [rank-step file-step] (cond
-                                (same-rank? from to) (if (< file-from file-to) [0 1] [0 -1])
-                                (same-file? from to) (if (< rank-from rank-to) [1 0] [-1 0])
-                                (same-diagonal? from to) (cond
-                                                           (and (< rank-from rank-to) (< file-from file-to)) [1 1]
-                                                           (and (< rank-from rank-to) (> file-from file-to)) [1 -1]
-                                                           (and (> rank-from rank-to) (> file-from file-to)) [-1 -1]
-                                                           (and (> rank-from rank-to) (< file-from file-to)) [-1 1]))]
-    (loop [curr from]
-      (cond
-        (= curr to) false
-        (pieces curr) true
-        :else (recur (assoc curr
-                            :rank (-> curr :rank (rank-plus rank-step))
-                            :file (-> curr :file (file-plus file-step))))))))
-
 (defn- eligible-for-promotion? [piece to]
   (and
    (= (:type piece) :pawn)
@@ -192,6 +200,7 @@
 (defn- find-a-piece-to-move [pieces color movement]
   (let [{type :type
          to   :square
+         captures? :captures
          {departure-file :file
           departure-rank :rank} :departure} movement
         promotion (:promotion movement)]
@@ -205,10 +214,9 @@
           (if departure-file (= departure-file (:file from)) true)
           (if departure-rank (= departure-rank (:rank from)) true)
           (if promotion (eligible-for-promotion? piece to) true)
-          (if (pieces to)
+          (if captures?
             (can-capture? pieces from to)
-            (can-move? pieces from to))
-          (not (any-obsticles? pieces from to))))
+            (can-move? pieces from to))))
       pieces))))
 
 (defn- find-last-move [pieces]
@@ -251,14 +259,6 @@
            king-to (assoc king :moved (+ 1 last-move))
            rook-to (assoc rook :moved (+ 1 last-move)))))
 
-(defn- castle-kingside [pieces color]
-  (let [rank (color {:white :1
-                     :black :8})]
-    (castle pieces {:king {:from (square :e rank)
-                           :to   (square :g rank)}
-                    :rook {:from (square :h rank)
-                           :to   (square :f rank)}})))
-
 (defn- castle-queenside [pieces color]
   (let [rank (color {:white :1
                      :black :8})]
@@ -266,6 +266,14 @@
                            :to   (square :c rank)}
                     :rook {:from (square :a rank)
                            :to   (square :d rank)}})))
+
+(defn- castle-kingside [pieces color]
+  (let [rank (color {:white :1
+                     :black :8})]
+    (castle pieces {:king {:from (square :e rank)
+                           :to   (square :g rank)}
+                    :rook {:from (square :h rank)
+                           :to   (square :f rank)}})))
 
 (defn move [pieces color move]
   (let [movement (parse-movement move)]
