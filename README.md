@@ -10,7 +10,6 @@ $ lein run
 
 ## TODO
 
-* [ ] pawn takes in passing (en passant)
 * [ ] check
 * [ ] checkmate
 

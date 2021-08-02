@@ -21,17 +21,17 @@
     "0-0"   {:castle :kingside}
     "0-0-0" {:castle :queenside}
     (let [matcher (re-matcher
-                   #"(?<type>[KQBNR])?(?<departurefile>[abcdefgh])?(?<departurerank>[123456789])?(?<captures>x)?(?<file>[abcdefgh])(?<rank>[12345678])=?(?<promotion>[QBNR])?(?<note>[+#!?])?"
+                   #"(?<type>[KQBNR])?(?<fromfile>[abcdefgh])?(?<fromrank>[123456789])?(?<captures>x)?(?<file>[abcdefgh])(?<rank>[12345678])=?(?<promotion>[QBNR])?(?<note>[+#!?])?"
                    movement)]
       (if (.matches matcher)
-        {:departure {:file (keyword (.group matcher "departurefile"))
-                     :rank (keyword (.group matcher "departurerank"))}
+        {:from {:file (keyword (.group matcher "fromfile"))
+                :rank (keyword (.group matcher "fromrank"))}
          :type      ({"K" :king "Q" :queen "B" :bishop "N" :knight "R" :rook "P" :pawn}
                      (.group matcher "type")
                      :pawn)
          :captures  (some? (.group matcher "captures"))
-         :square    {:file (keyword (.group matcher "file"))
-                     :rank (keyword (.group matcher "rank"))}
+         :to    {:file (keyword (.group matcher "file"))
+                 :rank (keyword (.group matcher "rank"))}
          :note      ({"+" :check "#" :checkmate "!" :good-move "?" :poor-move}
                      (.group matcher "note"))
          :promotion ({"Q" :queen "B" :bishop "N" :knight "R" :rook}
@@ -166,12 +166,32 @@
      (= 1 (distance from to)))
    (not (any-obsticles? pieces from to))))
 
+(defn- find-last-move [pieces]
+  (->> pieces
+       (map #(-> % last :moved))
+       (map #(if (nil? %) 0 %))
+       (apply max)))
+
+(defn- en-passant? [pieces from at]
+  (let [target (pieces at)]
+    (and
+     (nil? target)
+     (let [last-move (find-last-move pieces)
+           piece (pieces from)
+           en-passant-target (pieces (square (:file at) (:rank from)))]
+       (and
+        (= :pawn (:type en-passant-target))
+        (not= (:color en-passant-target) (:color piece))
+        (= last-move (:moved en-passant-target)))))))
+
 (defmulti ^:private can-capture? (fn [pieces from _] (:type (pieces from))))
 
 (defmethod can-capture? :pawn [pieces from at]
   (let [target (pieces at)]
     (and
-     target
+     (or
+      target
+      (en-passant? pieces from at))
      (not=
       (:color (pieces from))
       (:color target))
@@ -199,10 +219,10 @@
 
 (defn- find-a-piece-to-move [pieces color movement]
   (let [{type :type
-         to   :square
+         to   :to
          captures? :captures
-         {departure-file :file
-          departure-rank :rank} :departure} movement
+         {from-file :file
+          from-rank :rank} :from} movement
         promotion (:promotion movement)]
     (first
      (filter
@@ -211,24 +231,18 @@
          (and
           (-> piece :type  (= type))
           (-> piece :color (= color))
-          (if departure-file (= departure-file (:file from)) true)
-          (if departure-rank (= departure-rank (:rank from)) true)
+          (if from-file (= from-file (:file from)) true)
+          (if from-rank (= from-rank (:rank from)) true)
           (if promotion (eligible-for-promotion? piece to) true)
           (if captures?
             (can-capture? pieces from to)
             (can-move? pieces from to))))
       pieces))))
 
-(defn- find-last-move [pieces]
-  (->> pieces
-       (map #(-> % last :moved))
-       (map #(if (nil? %) 0 %))
-       (apply max)))
-
 (defn- make-a-move [pieces color movement]
   (let [last-move (find-last-move pieces)
         promote-to (:promotion movement)
-        to (:square movement)
+        to (:to movement)
         [from piece] (find-a-piece-to-move pieces color movement)]
     (when (nil? piece)
       (throw (ex-info (str "Can't move like that") {:move movement})))
@@ -237,7 +251,10 @@
            (nil? promote-to))
       (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
     (let [piece (if promote-to (assoc piece :type promote-to) piece)
-          piece (assoc piece :moved (+ 1 last-move))]
+          piece (assoc piece :moved (+ 1 last-move))
+          pieces (if (en-passant? pieces from to)
+                   (assoc pieces (square (:file to) (:rank from)) nil)
+                   pieces)]
       (assoc pieces
              from nil
              to piece))))

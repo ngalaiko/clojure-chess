@@ -172,9 +172,10 @@
         (move :white "b5")      (move :black "Qb6")
         (move :white "bxc6")    (move :black "Qd4")
         (move :white "cxb7")    (move :black "Qxa1")
-        (move :white "bxc8=R#"))))
-  ;(testing "En passant"
-    ;(-> pieces
-        ;(move :white "e4")   (move :black "e6")
-        ;(move :white "e5")   (move :black "d5")
-        ;(move :white "exd6"))))
+        (move :white "bxc8=R#")))
+
+  (testing "En passant"
+    (-> pieces
+        (move :white "e4")   (move :black "e6")
+        (move :white "e5")   (move :black "d5")
+        (move :white "exd6"))))
