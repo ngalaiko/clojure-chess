@@ -239,25 +239,42 @@
             (can-move? pieces from to))))
       pieces))))
 
-(defn- make-a-move [pieces color movement]
-  (let [last-move (find-last-move pieces)
-        promote-to (:promotion movement)
-        to (:to movement)
-        [from piece] (find-a-piece-to-move pieces color movement)]
+(defn- get-moves [pieces color movement]
+  (let [promote-to (:promotion movement)
+        move-to (:to movement)
+        [move-from piece] (find-a-piece-to-move pieces color movement)]
     (when (nil? piece)
       (throw (ex-info (str "Can't move like that") {:move movement})))
     (when (and
-           (eligible-for-promotion? piece to)
+           (eligible-for-promotion? piece move-to)
            (nil? promote-to))
       (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
-    (let [piece (if promote-to (assoc piece :type promote-to) piece)
-          piece (assoc piece :moved (+ 1 last-move))
-          pieces (if (en-passant? pieces from to)
-                   (assoc pieces (square (:file to) (:rank from)) nil)
-                   pieces)]
-      (assoc pieces
-             from nil
-             to piece))))
+    [(fn [pieces] ;; move piece
+       (let [piece (pieces move-from)]
+         (assoc pieces
+                move-from nil
+                move-to piece)))
+     (fn [pieces] ;; mark piece as moved
+       (let [piece (pieces move-to)
+             last-move (find-last-move pieces)
+             moved-piece (assoc piece :moved (+ 1 last-move))]
+         (assoc pieces
+                move-to moved-piece)))
+     (if promote-to ;; promote piece
+       (fn [pieces]
+         (let [piece (pieces move-to)
+               promoted-piece (assoc piece :type promote-to)]
+           (assoc pieces
+                  move-to promoted-piece)))
+       (fn [pieces] pieces) ;; noop
+       )
+     (if (en-passant? pieces move-from move-to)
+       (fn [pieces] ;; en passant capture
+         (let [en-passant-target (square (:file move-to) (:rank move-from))]
+           (assoc pieces
+                  en-passant-target nil)))
+       (fn [pieces] pieces) ;; noop
+       )]))
 
 (defn- castle [pieces {{king-from :from king-to :to} :king
                        {rook-from :from rook-to :to} :rook}]
@@ -297,4 +314,7 @@
     (case (:castle movement)
       :kingside  (castle-kingside  pieces color)
       :queenside (castle-queenside pieces color)
-      (make-a-move pieces color movement))))
+      (reduce
+       (fn [pieces move] (move pieces))
+       pieces
+       (get-moves pieces color movement)))))
