@@ -22,5 +22,9 @@
 
 (defn -main [& args]
   (println "Welcome to Clojure-chess!")
-  (println "Play using algebraic chess notation (i.e. \"e4\" or \"Nc3\")")
+  (println "")
+  (println "Play using algebraic chess notation:")
+  (println "R = rook,  N = knight, B = bishop, Q = queen, K = king, pawn is omitted.")
+  (println "For example: \"Nc3\" - move knight to c3, \"exd5\" - e pawn takes at d5, \"0-0-0\" - queenside castle")
+  (println "Read more: http://whitestone.my-pta.org/Content/1_23/Files/ChessNotation.pdf")
   (play :white game/pieces))
