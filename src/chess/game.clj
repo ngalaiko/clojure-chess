@@ -239,14 +239,14 @@
             (can-move? pieces from to))))
       pieces))))
 
-(defn move-piece [from to]
+(defn- move-piece [from to]
   (fn [pieces]
     (let [piece (pieces from)]
       (assoc pieces
              from nil
              to piece))))
 
-(defn mark-moved [& at]
+(defn- mark-moved [& at]
   (fn [pieces]
     (let [last-move (find-last-move pieces)]
       (reduce (fn [pieces at]
@@ -257,7 +257,22 @@
               pieces
               at))))
 
-(defn move-noop [] (fn [pieces] pieces))
+(defn- move-noop [] (fn [pieces] pieces))
+
+(defn- movement-string [{type :type {to-file :file
+                                     to-rank :rank} :to
+                         {from-file :file
+                          from-rank :rank} :from
+                         captures? :captures}]
+  (str
+   (if captures? "capture with " "move ")
+   (when from-file (name from-file))
+   (when from-rank (name from-rank))
+   (when (or from-file from-rank) " ")
+   (name type) " "
+   (if captures? "at" "to") " "
+   (name to-file)
+   (name to-rank)))
 
 (defmulti ^:private get-moves (fn [_ _ movement] (:castle movement)))
 
@@ -266,7 +281,7 @@
         move-to (:to movement)
         [move-from piece] (find-a-piece-to-move pieces color movement)]
     (when (nil? piece)
-      (throw (ex-info (str "Can't move like that") {:move movement})))
+      (throw (ex-info (str "Can't " (movement-string movement)) {:move movement})))
     (when (and
            (eligible-for-promotion? piece move-to)
            (nil? promote-to))
