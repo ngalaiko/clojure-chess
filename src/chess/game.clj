@@ -246,6 +246,15 @@
              from nil
              to piece))))
 
+(defn- remove-piece [at]
+  (fn [pieces] (assoc pieces at nil)))
+
+(defn- promote-piece [at to-type]
+  (fn [pieces]
+    (let [piece (pieces at)
+          promoted-piece (assoc piece :type to-type)]
+      (assoc pieces at promoted-piece))))
+
 (defn- mark-moved [& at]
   (fn [pieces]
     (let [last-move (find-last-move pieces)]
@@ -288,18 +297,11 @@
       (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
     [(move-piece move-from move-to)
      (mark-moved move-to)
-     (if promote-to ;; promote piece
-       (fn [pieces]
-         (let [piece (pieces move-to)
-               promoted-piece (assoc piece :type promote-to)]
-           (assoc pieces
-                  move-to promoted-piece)))
+     (if promote-to
+       (promote-piece move-to promote-to)
        (move-noop))
      (if (en-passant? pieces move-from move-to)
-       (fn [pieces] ;; en passant capture
-         (let [en-passant-target (square (:file move-to) (:rank move-from))]
-           (assoc pieces
-                  en-passant-target nil)))
+       (remove-piece (square (:file move-to) (:rank move-from)))
        (move-noop))]))
 
 (defn- castle [pieces {{king-from :from king-to :to} :king
