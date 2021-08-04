@@ -217,27 +217,26 @@
                    :white :8
                    :black :1))))
 
-(defn- find-a-piece-to-move [pieces color movement]
+(defn- valid-move? [pieces color movement]
   (let [{type :type
          to   :to
          captures? :captures
          {from-file :file
           from-rank :rank} :from} movement
-        promotion (:promotion movement)]
-    (first
-     (filter
-      #(let [from (first %)
-             piece (last %)]
-         (and
-          (-> piece :type  (= type))
-          (-> piece :color (= color))
-          (if from-file (= from-file (:file from)) true)
-          (if from-rank (= from-rank (:rank from)) true)
-          (if promotion (eligible-for-promotion? piece to) true)
-          (if captures?
-            (can-capture? pieces from to)
-            (can-move? pieces from to))))
-      pieces))))
+        promote-to (:promotion movement)]
+    (fn [[from piece]]
+      (and
+       (-> piece :type  (= type))
+       (-> piece :color (= color))
+       (if from-file (= from-file (:file from)) true)
+       (if from-rank (= from-rank (:rank from)) true)
+       (if captures?
+         (can-capture? pieces from to)
+         (can-move? pieces from to))
+       (-> promote-to boolean (= (eligible-for-promotion? piece to)))))))
+
+(defn- find-from [pieces color movement]
+  (first (first (filter (valid-move? pieces color movement) pieces))))
 
 (defn- move-piece [from to]
   (fn [pieces]
@@ -288,13 +287,9 @@
 (defmethod get-moves :default [pieces color movement]
   (let [promote-to (:promotion movement)
         move-to (:to movement)
-        [move-from piece] (find-a-piece-to-move pieces color movement)]
-    (when (nil? piece)
+        move-from (find-from pieces color movement)]
+    (when (nil? move-from)
       (throw (ex-info (str "Can't " (movement-string movement)) {:move movement})))
-    (when (and
-           (eligible-for-promotion? piece move-to)
-           (nil? promote-to))
-      (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
     [(move-piece move-from move-to)
      (mark-moved move-to)
      (if promote-to
