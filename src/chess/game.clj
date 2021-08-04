@@ -222,8 +222,7 @@
          to   :to
          captures? :captures
          {from-file :file
-          from-rank :rank} :from} movement
-        promote-to (:promotion movement)]
+          from-rank :rank} :from} movement]
     (fn [[from piece]]
       (and
        (-> piece :type  (= type))
@@ -232,11 +231,10 @@
        (if from-rank (= from-rank (:rank from)) true)
        (if captures?
          (can-capture? pieces from to)
-         (can-move? pieces from to))
-       (-> promote-to boolean (= (eligible-for-promotion? piece to)))))))
+         (can-move? pieces from to))))))
 
-(defn- find-from [pieces color movement]
-  (first (first (filter (valid-move? pieces color movement) pieces))))
+(defn- find-move [pieces color movement]
+  (->> pieces (filter (valid-move? pieces color movement)) first))
 
 (defn- move-piece [from to]
   (fn [pieces]
@@ -267,7 +265,7 @@
 
 (defn- move-noop [] (fn [pieces] pieces))
 
-(defn- movement-string [{type :type {to-file :file
+(defn- spell-movement [{type :type {to-file :file
                                      to-rank :rank} :to
                          {from-file :file
                           from-rank :rank} :from
@@ -287,9 +285,11 @@
 (defmethod get-moves :default [pieces color movement]
   (let [promote-to (:promotion movement)
         move-to (:to movement)
-        move-from (find-from pieces color movement)]
+        [move-from piece] (find-move pieces color movement)]
     (when (nil? move-from)
-      (throw (ex-info (str "Can't " (movement-string movement)) {:move movement})))
+      (throw (ex-info (str "Can't " (spell-movement movement)) {:move movement})))
+    (when (-> promote-to boolean (not= (eligible-for-promotion? piece move-to)))
+      (throw (ex-info (str "Pawn must be promoted to either Knight, Bishop, Rook or Queen") {})))
     [(move-piece move-from move-to)
      (mark-moved move-to)
      (if promote-to
