@@ -2,6 +2,72 @@
   (:require  [clojure.test :refer :all]
              [chess.game :refer :all]))
 
+(deftest invalid-moves
+  (testing "King captures protected piece"
+    (is (thrown-with-msg? Exception #"Can't capture with king at g3"
+                          (-> {{:file :g :rank :8} {:color :white :type :rook}
+                               {:file :g :rank :3} {:color :white :type :pawn}
+                               {:file :h :rank :2} {:color :black :type :king}}
+                              (move :black "Kxg3")))))
+
+  (testing "King captures own queen"
+    (is (thrown-with-msg? Exception #"Can't capture with king at g3"
+                          (-> {{:file :g :rank :3} {:color :black :type :pawn}
+                               {:file :h :rank :2} {:color :black :type :king}}
+                              (move :black "Kxg3")))))
+
+  (testing "Knight captures nothing"
+    (is (thrown-with-msg? Exception #"Can't capture with knight at e2"
+                          (-> {{:file :g :rank :3} {:color :black :type :knight}}
+                              (move :black "Nxe2")))))
+
+  (testing "Pawn moves to occupied piece"
+    (is (thrown-with-msg? Exception #"Can't move pawn to e5"
+                          (-> {{:file :e :rank :5} {:color :white :type :pawn}
+                               {:file :e :rank :4} {:color :white :type :pawn}}
+                              (move :white "e5")))))
+
+  (testing "Qeen jumps over own piece"
+    (is (thrown-with-msg? Exception #"Can't move queen to e2"
+                          (-> {{:file :e :rank :8} {:color :white :type :queen}
+                               {:file :e :rank :4} {:color :white :type :rook}}
+                              (move :white "Qe2")))))
+
+  (testing "Bishop jumps over opponents piece"
+    (is (thrown-with-msg? Exception #"Can't move bishop to b7"
+                          (-> {{:file :f :rank :3} {:color :black :type :bishop}
+                               {:file :d :rank :5} {:color :white :type :pawn}}
+                              (move :black "Bb7")))))
+
+  (testing "King moves under check"
+    (is (thrown-with-msg? Exception #"Can't move king to d1"
+                          (-> {{:file :e :rank :1} {:color :white :type :king}
+                               {:file :d :rank :8} {:color :black :type :rook}}
+                              (move :white "Kd1")))))
+
+  (testing "Pawn reaches the last rank without promotion"
+    (is (thrown-with-msg? Exception #"Pawn must be promoted to either Knight, Bishop, Rook or Queen"
+                          (-> {{:file :e :rank :7} {:color :white :type :pawn}}
+                              (move :white "e8")))))
+
+  (testing "Castling after the king was moved"
+    (is (thrown-with-msg? Exception #"Can't castle: king was moved"
+                          (-> {{:file :a :rank :8} {:color :black :type :rook}
+                               {:file :e :rank :8} {:color :black :type :king :moved 3}}
+                              (move :black "0-0-0")))))
+
+  (testing "Castling after the rook was moved"
+    (is (thrown-with-msg? Exception #"Can't castle: rook was moved"
+                          (-> {{:file :h :rank :1} {:color :black :type :rook :moved 1}
+                               {:file :e :rank :1} {:color :black :type :king}}
+                              (move :white "0-0")))))
+
+  (testing "En passant on the next move"
+    (is (thrown-with-msg? Exception #"Can't capture with e pawn at d6"
+                          (-> {{:file :d :rank :5} {:color :black :type :pawn :moved 1}
+                               {:file :e :rank :5} {:color :white :type :pawn :moved 2}}
+                              (move :white "exd6"))))))
+
 (deftest valid-games
   (testing "Kasparov vs. Topalov, Wijk aan Zee 1999"
     (-> pieces

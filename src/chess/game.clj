@@ -67,9 +67,20 @@
         dy (-> y1 (- y2) abs)]
     (= dx dy)))
 
+(defmulti ^:private can-capture? (fn [pieces from _] (:type (pieces from))))
 (defmulti ^:private any-obsticles? (fn [pieces from _] (:type (pieces from))))
 
 (defmethod any-obsticles? :knight [_ _ _] false)
+
+(defmethod any-obsticles? :king [pieces from to]
+  (let [piece (pieces from)
+        oppose-color (-> piece :color {:white :black :black :white})
+        pieces (assoc pieces from nil to piece)]
+    (->> pieces
+         (filter #(-> % last :color (= oppose-color)))
+         (filter (fn [[from _]] (can-capture? pieces from to)))
+         first
+         some?)))
 
 (defmethod any-obsticles? :default [pieces from to]
   (let [rank-from (-> from :rank rank-to-int)
@@ -112,33 +123,38 @@
 
 (defmethod can-move? :rook [pieces from to]
   (and
+   (nil? (pieces to))
    (or
     (same-file? from to)
     (same-rank? from to))
    (not (any-obsticles? pieces from to))))
 
-(defmethod can-move? :knight [_ from to]
+(defmethod can-move? :knight [pieces from to]
   (let [from-x (-> from :rank rank-to-int)
         from-y (-> from :file file-to-int)
         to-x   (-> to   :rank rank-to-int)
         to-y   (-> to   :file file-to-int)]
-    (or
-     (and (-> from-x (+ 2) (= to-x)) (-> from-y (+ 1) (= to-y)))
-     (and (-> from-x (+ 2) (= to-x)) (-> from-y (- 1) (= to-y)))
-     (and (-> from-x (- 2) (= to-x)) (-> from-y (+ 1) (= to-y)))
-     (and (-> from-x (- 2) (= to-x)) (-> from-y (- 1) (= to-y)))
-     (and (-> from-x (+ 1) (= to-x)) (-> from-y (+ 2) (= to-y)))
-     (and (-> from-x (+ 1) (= to-x)) (-> from-y (- 2) (= to-y)))
-     (and (-> from-x (- 1) (= to-x)) (-> from-y (+ 2) (= to-y)))
-     (and (-> from-x (- 1) (= to-x)) (-> from-y (- 2) (= to-y))))))
+    (and
+     (nil? (pieces to))
+     (or
+      (and (-> from-x (+ 2) (= to-x)) (-> from-y (+ 1) (= to-y)))
+      (and (-> from-x (+ 2) (= to-x)) (-> from-y (- 1) (= to-y)))
+      (and (-> from-x (- 2) (= to-x)) (-> from-y (+ 1) (= to-y)))
+      (and (-> from-x (- 2) (= to-x)) (-> from-y (- 1) (= to-y)))
+      (and (-> from-x (+ 1) (= to-x)) (-> from-y (+ 2) (= to-y)))
+      (and (-> from-x (+ 1) (= to-x)) (-> from-y (- 2) (= to-y)))
+      (and (-> from-x (- 1) (= to-x)) (-> from-y (+ 2) (= to-y)))
+      (and (-> from-x (- 1) (= to-x)) (-> from-y (- 2) (= to-y)))))))
 
 (defmethod can-move? :bishop [pieces from to]
   (and
+   (nil? (pieces to))
    (same-diagonal? from to)
    (not (any-obsticles? pieces from to))))
 
 (defmethod can-move? :queen [pieces from to]
   (and
+   (nil? (pieces to))
    (or
     (same-file? from to)
     (same-rank? from to)
@@ -147,6 +163,7 @@
 
 (defmethod can-move? :king [pieces from to]
   (and
+   (nil? (pieces to))
    (<= (distance from to) 1)
    (or
     (same-file? from to)
@@ -156,6 +173,7 @@
 
 (defmethod can-move? :pawn [pieces from to]
   (and
+   (nil? (pieces to))
    (same-file? from to)
    (case (:color (pieces from))
      :white (upwards? from to)
@@ -184,8 +202,6 @@
         (not= (:color en-passant-target) (:color piece))
         (= last-move (:moved en-passant-target)))))))
 
-(defmulti ^:private can-capture? (fn [pieces from _] (:type (pieces from))))
-
 (defmethod can-capture? :pawn [pieces from at]
   (let [target (pieces at)]
     (and
@@ -208,7 +224,7 @@
      (not=
       (:color (pieces from))
       (:color target))
-     (can-move? pieces from at))))
+     (can-move? (assoc pieces at nil) from at))))
 
 (defn- eligible-for-promotion? [piece to]
   (and
@@ -266,10 +282,10 @@
 (defn- move-noop [] (fn [pieces] pieces))
 
 (defn- spell-movement [{type :type {to-file :file
-                                     to-rank :rank} :to
-                         {from-file :file
-                          from-rank :rank} :from
-                         captures? :captures}]
+                                    to-rank :rank} :to
+                        {from-file :file
+                         from-rank :rank} :from
+                        captures? :captures}]
   (str
    (if captures? "capture with " "move ")
    (when from-file (name from-file))
